@@ -1,5 +1,13 @@
-# Liminal Dimension
+# 《未完全死亡》
 
-A Minecraft Java Edition mod project exploring a mysterious dimension between life and death.
+This is the Minecraft Java Edition mod project 《未完全死亡》. The current phase
+covers the project foundation, underlying technology and necessary test
+infrastructure. The in-game display name is `未完全死亡` and the internal
+Mod ID is `liminal_dimension`.
 
-> Project status: M0 — engineering setup pending. No gameplay features have been implemented yet.
+M0 engineering setup is complete, and [PR #1](https://github.com/Copule/liminal-dimension-mod/pull/1)
+is awaiting review and merge. Gameplay development has yet to begin, and
+single-player world playtesting is pending.
+
+See the [roadmap](docs/roadmap.md) for milestone status and the
+[architecture notes](docs/architecture.md) for build and verification results.
