@@ -1,6 +1,6 @@
 # M0 engineering bootstrap
 
-Liminal Dimension is a single Java module. NeoForge discovers the mod through
+The 《未完全死亡》 mod is a single Java module. NeoForge discovers it through
 `META-INF/neoforge.mods.toml` and constructs the class annotated with
 `@Mod("liminal_dimension")`. The constructor writes the INFO message
 `Liminal Dimension initialized (liminal_dimension).` on either physical side.
@@ -31,6 +31,15 @@ The template license is in `TEMPLATE_LICENSE.txt`.
 | `src/main/templates/META-INF/neoforge.mods.toml` | Declares the mod identity and the Minecraft and NeoForge loader dependencies. |
 | `src/main/java/io/github/copule/liminaldimension/LiminalDimension.java` | Common entry point. Keep its annotation ID in sync with `mod_id`. |
 | `.github/workflows/build.yml` | Runs the Wrapper build on Linux with Temurin 25 for pushes and pull requests. |
+
+## M0-06 display name
+
+The existing ModDevGradle template expands `mod_name` from `gradle.properties`
+into the NeoForge metadata. A shared property keeps the Mods list name and
+description in sync. Unicode escapes let Gradle's Java properties reader
+load the Chinese name. The pinned toolchain already supports this approach.
+[NeoForge mod metadata](https://docs.neoforged.net/docs/gettingstarted/modfiles/)
+and [Gradle 9.2.1 properties loading](https://github.com/gradle/gradle/blob/v9.2.1/platforms/core-runtime/base-services/src/main/java/org/gradle/util/internal/GUtil.java#L192-L222).
 
 ## Local verification
 

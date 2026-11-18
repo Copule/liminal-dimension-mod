@@ -1,16 +1,22 @@
-# Agent collaboration rules — Liminal Dimension
+# Agent collaboration rules — 《未完全死亡》
 
 ## Authority
 - GitHub repository Copule/liminal-dimension-mod is the single source of truth for code.
-- The approved 72-item V1.0 requirement list is authoritative for gameplay; do not infer missing items from summaries or research proposals.
+- The original, approved 72-item V1.0 requirement list is authoritative for gameplay. Preserve its original wording and item numbers. Do not reconstruct missing entries from summaries or research proposals.
 - Research recommendations are not automatically approved requirements.
 - Never disclose or publish private story/art contributions without authorization.
 
 ## M0 scope
 - Bootstrap a minimal Minecraft Java 26.3 / NeoForge ModDevGradle project targeting Java 25.
-- Mod ID: `liminal_dimension`; display name: `Liminal Dimension`.
+- The official project title is 《未完全死亡》. Use `未完全死亡` as the in-game display name and `liminal_dimension` as the internal Mod ID. The project owner decides any official English title.
 - No gameplay systems, dimensions, death hooks, assets, bosses, or story implementation in M0.
 - Prefer the official NeoForgeMDKs/MDK-26.3-ModDevGradle template; preserve the Gradle wrapper and record any version changes.
+
+## Current development boundary
+- Develop only the project foundation, underlying technology and necessary test infrastructure.
+- Do not define or implement worldbuilding, story, civilization background, dimension art direction, boss concepts or formal gameplay mechanics.
+- If work depends on a world setting or gameplay decision reserved for the project owner, stop the affected work and report the decision needed.
+- Technical research is allowed. Follow the Discovery-first policy below and prioritize finding and evaluating existing solutions.
 
 ## Branch and PR discipline
 - Never commit directly to `main` or force-push.
