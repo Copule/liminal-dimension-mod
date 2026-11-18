@@ -1,16 +1,19 @@
 # Roadmap
 
-## M0 — engineering bootstrap (in progress)
+## M0 — engineering bootstrap (implementation complete, merge pending)
 - [x] Existing GitHub repository and main baseline verified.
 - [x] Isolated `feat/m0-neoforge-bootstrap` branch created.
 - [x] Official Minecraft 26.3 ModDevGradle MDK located; Java 25 target confirmed in template.
-- [ ] Import official MDK without replacing existing README.
-- [ ] Configure mod ID `liminal_dimension` and display name `Liminal Dimension`.
-- [ ] Add minimal entrypoint and architecture documentation.
-- [ ] Add GitHub Actions Gradle build workflow.
-- [ ] Run Gradle build and inspect output JAR.
-- [ ] Run Minecraft development client and verify mod loads.
-- [ ] Open PR; review and merge only with owner approval.
+- [x] Import the official MDK.
+- [x] Configure mod ID `liminal_dimension` and display name `Liminal Dimension`.
+- [x] Add the minimal entry point and architecture documentation.
+- [x] Add the GitHub Actions Gradle build workflow.
+- [x] Run the Gradle build and inspect the output JAR.
+- [x] Run the Minecraft development client and verify that the mod loads.
+- [x] Verify the packaged JAR in a standalone client and a dedicated server. See the [verification record](architecture.md#m0-packaged-jar-acceptance-2026-11-18).
+- [x] Open [PR #1](https://github.com/Copule/liminal-dimension-mod/pull/1).
+- [ ] Playtest a single-player world with the packaged JAR.
+- [ ] Review and merge PR #1 with owner approval.
 
 ## After M0 (not part of bootstrap)
 - Architecture and persistence prototypes.

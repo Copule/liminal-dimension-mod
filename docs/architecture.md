@@ -60,3 +60,24 @@ source set. JAR inspection verifies packaging separately.
 | `.\gradlew.bat --no-daemon --console=plain build` | First download of `jspecify-1.0.1.jar` failed with TLS `bad_record_mac`. Retrying the same command succeeded in 3m 26s, with five tasks executed. `:test` reported `NO-SOURCE`. |
 | Python `zipfile` and `tomllib` inspection of `build/libs/liminal_dimension-0.1.0-SNAPSHOT.jar` | Verified one class (major version 69), expanded mod ID, name and version, and dependency ranges `[26.3]` and `[26.3.0.113,)`. SHA-256: `eef0c7d6f1a0a91c8bbc5e1881f8e7244bd2b189eefb67c9a91a6166def83dee`. |
 | `.\gradlew.bat --no-daemon --console=plain runClient` | The NeoForge 26.3 window reached the first-launch welcome screen. The loader listed `Liminal Dimension 0.1.0-SNAPSHOT (liminal_dimension)` and the mod constructor logged `Liminal Dimension initialized (liminal_dimension).`. Closing the window shut down FML normally and Gradle reported `BUILD SUCCESSFUL`. |
+
+### M0 packaged JAR acceptance (2026-11-18)
+
+Tested `build/libs/liminal_dimension-0.1.0-SNAPSHOT.jar` from commit
+`e56ad5c808a80d4a7e1dca277ad5c377ef02e976` in separate Minecraft 26.3 /
+NeoForge 26.3.0.113 installations on Windows with Microsoft OpenJDK 25.0.1.
+Both installed copies matched the JAR's SHA-256 recorded above. The loader
+identified the file as `jar(mods/liminal_dimension-0.1.0-SNAPSHOT.jar)` and
+the mod logged its initialization on both sides.
+
+| Check | Result | Local evidence file |
+| --- | --- | --- |
+| Standalone client | Passed. FML reported `CLIENT in PROD`. The client started in local demo mode and the Mods screen showed Liminal Dimension, mod ID `liminal_dimension` and version `0.1.0-SNAPSHOT`. | `logs/client-latest.log`, `Mods详情页.png` |
+| Dedicated server | Passed on retry. FML reported `DEDICATED_SERVER in PROD`. The server reached `Done (2.981s)!`, saved the test world after `stop` and exited normally. The first attempt initialized the mod and then failed when the sandbox denied a loopback connection. | `logs/server-latest.log`, `logs/server-first-latest.log` |
+
+The local evidence directory is `M0-验收/2026-11-18-成品JAR/` at the repository
+root. It contains `中文验收报告.md`, `SHA256.txt`, the screenshot, raw logs and
+the recorded launch commands. The archive is kept outside Git.
+
+Single-player world playtesting and joining the dedicated server from a
+client remain pending.
