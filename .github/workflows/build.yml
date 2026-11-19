@@ -8,6 +8,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,5 +22,25 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build with Gradle
-        run: ./gradlew --no-daemon build
+      - name: Build and run project tests
+        run: ./gradlew --no-daemon --console=plain --continue build runGameTestServer
+
+      - name: Collect GameTest summary on failure
+        if: failure()
+        shell: bash
+        run: |
+          if [[ -f build/gametest/logs/latest.log ]]; then
+            grep -F 'GameTestServer' build/gametest/logs/latest.log > build/gametest/server-summary.log || true
+          fi
+
+      - name: Retain test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: project-test-reports
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            build/test-results/test/TEST-*.xml
+            build/gametest/results.xml
+            build/gametest/server-summary.log

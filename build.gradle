@@ -27,7 +27,7 @@ sourceSets.main.resources {
 }
 
 repositories {
-    // Add here additional repositories if required by some of the dependencies below.
+    mavenCentral()
 }
 
 base {
@@ -37,6 +37,12 @@ base {
 // Mojang ships Java 25 to end users in 26.3, so mods should target Java 25.
 java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
+sourceSets {
+    gameTest {
+        compileClasspath += sourceSets.main.output
+    }
+}
+
 neoForge {
     // Specify the version of NeoForge to use.
     version = project.neo_version
@@ -44,27 +50,36 @@ neoForge {
     // This line is optional. Access Transformers are automatically detected
     // accessTransformers = project.files('src/main/resources/META-INF/accesstransformer.cfg')
 
+    addModdingDependenciesTo sourceSets.gameTest
+
+    mods {
+        "${mod_id}" {
+            sourceSet sourceSets.main
+        }
+        // A single exploded mod with the same metadata, plus the test subscriber.
+        gameTestFixture {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.gameTest
+        }
+    }
+
     // Default run configurations.
     // These can be tweaked, removed, or duplicated as needed.
     runs {
         client {
             client()
-            // Comma-separated list of namespaces to load gametests from. Empty = all namespaces.
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
         server {
             server()
             programArgument '--nogui'
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
         }
 
-        // This run config launches GameTestServer and runs all registered gametests, then exits.
-        // By default, the server will crash when no gametests are provided.
-        // The gametest system is also enabled by default for other run configs under the /test command.
         gameTestServer {
-            type = "gameTestServer"
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+            type = 'gameTestServer'
+            gameDirectory = layout.buildDirectory.dir('gametest')
+            programArguments.addAll '--tests', providers.gradleProperty('gameTestFilter').getOrElse("${mod_id}:*"),
+                    '--report', 'results.xml', '--universe', 'universe'
         }
 
         data {
@@ -78,6 +93,7 @@ neoForge {
 
         // applies to all the run configs above
         configureEach {
+            loadedMods = name == 'gameTestServer' ? [mods.gameTestFixture] : [mods.getByName(project.mod_id)]
             // Recommended logging data for a userdev environment
             // The markers can be added/remove as needed separated by commas.
             // "SCAN": For mods scan.
@@ -88,16 +104,7 @@ neoForge {
             // Recommended logging level for the console
             // You can set various levels here.
             // Please read: https://stackoverflow.com/questions/2031163/when-to-use-the-different-log-levels
-            logLevel = org.slf4j.event.Level.DEBUG
-        }
-    }
-
-    mods {
-        // define mod <-> source bindings
-        // these are used to tell the game which sources are for which mod
-        // multi mod projects should define one per mod
-        "${mod_id}" {
-            sourceSet(sourceSets.main)
+            logLevel = name == 'gameTestServer' ? org.slf4j.event.Level.INFO : org.slf4j.event.Level.DEBUG
         }
     }
 }
@@ -111,6 +118,10 @@ configurations {
 }
 
 dependencies {
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
     // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
@@ -134,6 +145,8 @@ dependencies {
     // http://www.gradle.org/docs/current/userguide/dependency_management.html
 }
 
+apply from: 'gradle/test-verification.gradle'
+
 // This block of code expands all declared replace properties in the specified resource targets.
 // A missing property will result in an error. Properties are expanded using ${} Groovy notation.
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
@@ -146,6 +159,7 @@ var generateModMetadata = tasks.register("generateModMetadata", ProcessResources
             mod_license            : mod_license,
             mod_version            : mod_version,
     ]
+    filteringCharset = 'UTF-8'
     inputs.properties replaceProperties
     expand replaceProperties
     from "src/main/templates"

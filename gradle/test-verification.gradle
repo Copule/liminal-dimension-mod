@@ -1,0 +1,63 @@
+import groovy.xml.XmlSlurper
+import java.nio.file.Files
+
+// Both producers must execute again, including when the configuration cache is reused.
+def junitDir = layout.buildDirectory.dir('test-results/test').get().asFile
+def gameXml = layout.buildDirectory.file('gametest/results.xml').get().asFile
+def projectPackage = project.mod_group_id + '.'
+def namespace = project.mod_id + ':'
+
+def clearJUnit = tasks.register('clearJUnitReports', Delete) {
+    delete junitDir
+}
+
+def verifyJUnit = tasks.register('verifyJUnitReports') {
+    dependsOn tasks.named('test')
+    doLast {
+        def reports = junitDir.listFiles()?.findAll { it.name.startsWith('TEST-') && it.name.endsWith('.xml') } ?: []
+        TestReport.check('JUnit', reports, 'classname', projectPackage)
+    }
+}
+
+tasks.named('test', Test) {
+    useJUnitPlatform()
+    dependsOn clearJUnit
+    reports.junitXml.outputLocation = junitDir
+    reports.junitXml.includeSystemOutLog = false
+    reports.junitXml.includeSystemErrLog = false
+    outputs.upToDateWhen { false }
+    outputs.doNotCacheIf('Require a fresh JUnit run') { true }
+    finalizedBy verifyJUnit
+}
+
+tasks.matching { it.name == 'runGameTestServer' }.configureEach {
+    doFirst { Files.deleteIfExists(gameXml.toPath()) }
+    doLast { TestReport.check('GameTest', [gameXml], 'name', namespace) }
+}
+
+class TestReport {
+    static void check(String layer, Collection<File> files, String identity, String prefix) {
+        int passed = 0
+        int failed = 0
+        int skipped = 0
+        files.each { file ->
+            if (!file.isFile()) {
+                throw new GradleException("Missing ${layer} report: ${file.name}")
+            }
+            def cases = new XmlSlurper().parse(file).depthFirst().findAll { it.name() == 'testcase' }
+            cases.each { test ->
+                if (test.failure.size() || test.error.size()) {
+                    failed++
+                } else if (test.skipped.size()) {
+                    skipped++
+                } else if (test.attributes()[identity]?.startsWith(prefix)) {
+                    passed++
+                }
+            }
+        }
+        println "${layer}: ${passed} project cases passed, ${failed} failures/errors, ${skipped} skipped"
+        if (!passed || failed || skipped) {
+            throw new GradleException("${layer} requires a passing ${prefix} case and no failed or skipped cases.")
+        }
+    }
+}
