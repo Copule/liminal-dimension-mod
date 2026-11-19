@@ -115,7 +115,14 @@ neoForge {
 
 // Keep the project's generated descriptor ahead of loader resources in the JUnit worker.
 sourceSets.test.runtimeClasspath = sourceSets.main.output + sourceSets.test.runtimeClasspath
+def productionJar = tasks.named('jar', Jar).flatMap { it.archiveFile }
 tasks.named('test', Test) {
+    inputs.file(productionJar)
+    systemProperty 'liminal.productionJar', productionJar.get().asFile.absolutePath
+    systemProperty 'liminal.mainClassDirs', sourceSets.main.output.classesDirs.asPath
+    systemProperty 'liminal.modVersion', project.mod_version
+    systemProperty 'liminal.minecraftRange', project.minecraft_version_range
+    systemProperty 'liminal.neoVersion', project.neo_version
     // NbtOps initializes the game logger even in a standalone JUnit worker.
     workingDir = layout.buildDirectory.dir('junit-work').get().asFile
     doFirst { workingDir.mkdirs() }
