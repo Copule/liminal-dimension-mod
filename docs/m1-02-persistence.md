@@ -49,3 +49,9 @@
 执行 `./gradlew --continue build runGameTestServer`，Windows 使用 `.\gradlew.bat`。GameTest 强制检查专用服务器类型和 `build/gametest` 下的 `universe/gametestworld`，此约束与 M1-01 运行配置对应。故障注入分别在实际原生编码和已验证暂存文件的发布边界发生。发布用例使用真实 NIO 原子移动、缺失源和真实目标触发异常；设备断电不在该用例覆盖范围。符号链接探针仅在主机成功创建测试链接时计为实测。
 
 [PR #4 的构建与逐轮测试记录](https://github.com/Copule/liminal-dimension-mod/pull/4/checks)
+
+## 双平台验证记录
+
+实现提交 `50e9d8bc8db34ebadf418becd0adf680efd03c95` 在 Windows 11 / NTFS（Microsoft OpenJDK 25.0.1）和 GitHub Ubuntu 26.04（Temurin 25.0.5）均通过构建。两端 JUnit 56/56、GameTest 8/8，通过用例标识逐项相同。已下载 Ubuntu 原始 XML 压缩包并核对 GitHub SHA-256 `f954e837acf5b2cef80bb36c8fc7c9a0088074678ee26e2560f74da559922b14`。[PR 构建 #19](https://github.com/Copule/liminal-dimension-mod/actions/runs/44532738092) · [测试 XML 归档](https://github.com/Copule/liminal-dimension-mod/actions/runs/44532738092/artifacts/14534367782)
+
+Windows 对 17 份样本独立复算关服后的 SHA-256，与测试记录的写入前、拒写或刷盘后均相同。其中原子发布和原生编码故障共用的原档哈希为 `bf7768350fc0f75b81b33433bb82fb525d1d0c1f40d68a4dba7e82acdd3c5e74`。Windows 正式 JAR 的 SHA-256 为 `1eb501aa2b4384f1d10b28f3c109390b25fd0baeb98b5309eb0b5dca8b43922f`，包内无测试类，Maven 元数据仅含 apiElements 和 runtimeElements。Ubuntu 实测拒绝目标文件符号链接；Windows 测试账户创建链接时缺少系统权限。
