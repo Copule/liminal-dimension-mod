@@ -13,18 +13,39 @@
 
 [NeoForge Saved Data](https://docs.neoforged.net/docs/datastorage/saveddata/) · [26.1 迁移说明](https://docs.neoforged.net/primer/docs/26.1/) · [Data Attachments](https://docs.neoforged.net/docs/datastorage/attachments/) · [目标版本源码包](https://maven.neoforged.net/releases/net/neoforged/neoforge/26.3.0.113/neoforge-26.3.0.113-sources.jar) · [DataFixerUpper](https://github.com/Mojang/DataFixerUpper)
 
-## 读写契约
+## 格式与迁移
 
-生产入口只接受逻辑服务端及其维度，在服务器线程执行。调用者提供项目命名空间内的专用键、不可变值与 Codec。每一版包含显式 schema_version 和 payload，Minecraft 外层的 DataVersion 由原生机制维护。打开缺档只返回 MISSING。读取 V1 得到 MIGRATED 与升级后的值，只有显式保存才发布 V2。V2 返回 LOADED。未来版本、坏字段、损坏数据和读取失败均禁止通过该句柄保存。缺失的非关键字段可由该版本的 Codec 明确给定默认值。
+`VersionedSchema.first(codec)` 定义独立的 V1。调用 `next(newCodec, oldToNew)` 得到下一版，原 schema 仍可读取和写出原版。历史解码器按顺序应用每一步转换，新版编码器只写当前版本。调用方提供具有值相等语义的不可变快照和无副作用的迁移函数。缺失的非关键字段可以在相应 Codec 中定义默认值；已存在且错误的字段会触发保护。
 
-26.3 的 SavedDataStorage.get 会缓存空结果，readSavedData 会捕获异常并尝试 resultOrPartial。computeIfAbsent 遇到空值会创建新对象，set 会调用 setDirty。原生 tryWrite 捕获 IOException，提交 Future 正常结束不足以说明字节写入成功。正常自动保存可调度后台写入，强制保存和正常关闭会调用 saveAndJoin。硬终止不保证执行关闭逻辑。
+信封包含 `schema_version` 和 `payload`。NBT 只接受正整数 IntTag；JSON 只接受十进制正整数数字记号。字符串、布尔、NBT 其他数值标签、带小数点或指数的 JSON 数字均视为 CORRUPT。超过当前版本的合法版本号先返回 FUTURE，读取器不会尝试解释其 payload。JSON 布尔和 NBT ByteTag 在 ops 转换后可能失去原类型，因此直接检查原始标签或记号。
 
-项目先读取目标文件，再在对应原生 storage 的专用暂存键上 set 并等待保存。NeoForge 的 IOUtilities 对临时文件 force(true)，随后尝试移动，某些文件系统会退回普通替换。项目验证暂存文件的完整 NBT 和解码结果后，才以同一目录的原子移动发布到目标文件；文件系统拒绝原子发布时向调用者报告失败。读写都核对目标状态，过期的句柄需要重新打开。暂存键归本模块独占，正常完成或失败后清理；进程被杀可能留下暂存文件，下次显式提交会重新生成。旧版本回滚副本不属于该流程。
+| 读取状态 | 保存契约 |
+| --- | --- |
+| MISSING | 确认文件缺失；允许显式初始化。 |
+| LOADED / MIGRATED | 含当前类型快照。只读、自动保存和正常关服均不会发布迁移。 |
+| CORRUPT | 格式、边界、完整性或解码错误；拒写。流读取过程中无法进一步分类的错误也走此保护。 |
+| FUTURE | 应用 schema 或外层 Minecraft DataVersion 高于支持版本；拒写。 |
+| IO_ERROR | 文件系统错误、目录占位或文件符号链接；拒写，保留路径和原因。 |
 
-约束为单个持有世界锁的服务端及模块专属键。离线编辑应在服务端关闭后进行。同一时刻由外部工具写文件、整机断电后的目录元数据持久性、跨文件事务和大批量高频写入均超出验证范围。正式 Mod 没有注册调用该原型的游戏事件。
+兼容缺省外层 DataVersion 的历史输入。已有 DataVersion 必须为正 IntTag。回读本次暂存文件时另外要求 DataVersion 存在且恰等于当前游戏版本。
 
-## 文件布局与运行
+## 两种作用域与提交
 
-全局文件为 `<世界>/data/liminal_dimension/<键>.dat`，维度文件为 `<世界>/dimensions/<维度命名空间>/<维度路径>/data/liminal_dimension/<键>.dat`。提交期间原生队列只持有同目录专用键 `<键>.pending.dat`。发布时要求快照按值相等；调用方应提供有值相等语义的不可变类型。适配器对读取的 NBT 使用 8 MiB 内存计量上限，支持未压缩文件和 gzip，并读到流结束以校验 gzip 尾部。大于当前 Minecraft DataVersion 的文件也进入 FUTURE。原生提交会顺带调度同一个 storage 中其他已经标脏的数据。
+全局文件为 `<世界>/data/liminal_dimension/<键>.dat`。维度文件为 `<世界>/dimensions/<命名空间>/<维度路径>/data/liminal_dimension/<键>.dat`，包括主世界。目录分别依据 26.3 MinecraftServer 和 ServerChunkCache 的原生布局。入口要求逻辑服务端线程。键使用小写 ASCII 字母、数字、短横线、下划线和分隔符。各段排除两套 26.3 FileUtil 校验中的保留名，目录段最长 255 字节，末段为 .dat 留出空间。世界根及中间目录归服务端控制。
 
-从项目根目录执行 `./gradlew --continue build runGameTestServer`，Windows 入口为 `.\gradlew.bat`。探针仅存在于测试源集。GameTest 检查服务器类型和隔离世界根目录，直接读取实际文件，覆盖迁移、过期句柄、遗留暂存文件、原生写入失败和再次打开。保存失败用例依赖 Windows NTFS / Ubuntu 常用文件系统的文件名组件长度限制。运行日志中该用例会产生一条预期的原生 I/O 错误。
+26.3 的 SavedDataStorage.get 会缓存空结果，readSavedData 捕获异常并允许部分解码结果，computeIfAbsent 可在读取失败后创建默认对象。tryWrite 捕获 IOException，Future 完成不能作为写入凭据。原生缓存没有逐键移除 API，scheduleSave 会收集同一 storage 中全部已标脏状态。
+
+1. 打开句柄时直读目标，限制 NBT 内存计量为 8 MiB。接受未压缩 NBT 或单一 gzip 成员。gzip 解码器验证 CRC 与长度，并在支持 mark/reset 的底层流上回到成员结束处。分别检查 NBT 内容结束及原始流结束，可识别尾随垃圾与空的第二成员。
+2. 显式提交前检查原始观察值，预编码新值，在目标同目录独占创建随机暂存文件。每次使用短生命周期的原生 SavedDataStorage，使用该作用域的目录、维度上下文、注册表和 DataFixer。其 set 调用 setDirty，close 等待自身的保存队列。其他原生数据保持各自的保存时机。
+3. 暂存文件须通过外层版本、NBT、内容和值相等性验证，再次检查目标后用 ATOMIC_MOVE 发布。原生编码与队列运行时错误包装为含原因的 IOException；文件系统写入、核验和发布失败也向调用者报告。保护状态会抛出 IllegalStateException，过期观察值冲突抛出 IOException。发布成功才更新句柄的观察值。
+4. 一次操作只会清理本次独占创建的暂存文件。先前进程的 .pending.dat、随机暂存文件和 NeoForge .neoforge-tmp 均原样留存。正式文件不参与任何目录遍历清理。
+
+该操作在服务端线程同步读盘并等待这一份数据刷盘，适用于低频小快照。NeoForge IOUtilities 在移动临时文件前 force(true)。外层最终发布要求文件系统支持同目录原子替换。硬终止可能遗留暂存文件，整机断电后的目录元数据、外部并发编辑及跨文件事务不在保证范围。正式游戏入口没有调用原型。
+
+## 依赖与测试方式
+
+沿用目标运行时已有的 Apache Commons Compress 1.28.0（Apache-2.0）单成员解码器。Gradle 9.2.1 的 java-test-fixtures 插件只编译一次探针；JUnit 与开发 GameTest 引用其产物。普通运行和生产 JAR 使用 main，Maven Java component 跳过两种测试夹具发布变体。[gzip 单成员边界契约](https://commons.apache.org/proper/commons-compress/apidocs/org/apache/commons/compress/compressors/gzip/GzipCompressorInputStream.html) · [Gradle 测试夹具](https://docs.gradle.org/9.2.1/userguide/java_testing.html#sec:java_test_fixtures)
+
+执行 `./gradlew --continue build runGameTestServer`，Windows 使用 `.\gradlew.bat`。GameTest 强制检查专用服务器类型和 `build/gametest` 下的 `universe/gametestworld`，此约束与 M1-01 运行配置对应。故障注入分别在实际原生编码和已验证暂存文件的发布边界发生。发布用例使用真实 NIO 原子移动、缺失源和真实目标触发异常；设备断电不在该用例覆盖范围。符号链接探针仅在主机成功创建测试链接时计为实测。
+
+[PR #4 的构建与逐轮测试记录](https://github.com/Copule/liminal-dimension-mod/pull/4/checks)

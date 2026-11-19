@@ -5,7 +5,7 @@ import java.util.Optional;
 
 /** Only loaded or migrated data has a snapshot. Snapshots must be immutable. */
 public record LoadResult<T>(State state, Optional<T> snapshot, String detail) {
-    public enum State { MISSING, LOADED, MIGRATED, CORRUPT, FUTURE }
+    public enum State { MISSING, LOADED, MIGRATED, CORRUPT, FUTURE, IO_ERROR }
 
     public LoadResult {
         Objects.requireNonNull(state);
@@ -20,7 +20,7 @@ public record LoadResult<T>(State state, Optional<T> snapshot, String detail) {
     }
 
     public void requireWritable() {
-        if (state == State.CORRUPT || state == State.FUTURE) {
+        if (state == State.CORRUPT || state == State.FUTURE || state == State.IO_ERROR) {
             throw new IllegalStateException(state + ": " + detail);
         }
     }
