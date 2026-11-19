@@ -75,7 +75,9 @@ source set. JAR inspection verifies packaging separately.
 Tested `build/libs/liminal_dimension-0.1.0-SNAPSHOT.jar` from commit
 `e56ad5c808a80d4a7e1dca277ad5c377ef02e976` in separate Minecraft 26.3 /
 NeoForge 26.3.0.113 installations on Windows with Microsoft OpenJDK 25.0.1.
-Both installed copies matched the JAR's SHA-256 recorded above. The loader
+Both installed copies matched the SHA-256 recorded above for that earlier
+artifact, `eef0c7d6f1a0a91c8bbc5e1881f8e7244bd2b189eefb67c9a91a6166def83dee`.
+The dedicated-server result applies to that artifact. The loader
 identified the file as `jar(mods/liminal_dimension-0.1.0-SNAPSHOT.jar)` and
 the mod logged its initialization on both sides.
 
@@ -88,5 +90,34 @@ The local evidence directory is `M0-验收/2026-11-18-成品JAR/` at the reposit
 root. It contains `中文验收报告.md`, `SHA256.txt`, the screenshot, raw logs and
 the recorded launch commands. The archive is kept outside Git.
 
-Single-player world playtesting and joining the dedicated server from a
-client remain pending.
+### M0-07 single-player world acceptance (2026-11-18)
+
+The standalone Windows x64 client ran Minecraft Java Edition 26.3,
+NeoForge 26.3.0.113 and Microsoft OpenJDK 25.0.1 in Demo mode.
+The tested `liminal_dimension-0.1.0-SNAPSHOT.jar` was built from
+`4e4cc6be6cad95fcdd41ed4a962a2e070e774c01`. Its SHA-256 is
+`362554492834249062d4dd31e18320db27d5eac80600fe45677c634bee243875`.
+
+| Check | Result |
+| --- | --- |
+| Build and standalone client | The recorded Gradle build passed. The standalone client loaded the packaged JAR, and the Mods screen showed `未完全死亡` with mod ID `liminal_dimension`. |
+| Single-player Demo world | Created a world from an empty saves directory, entered it, moved, saved and reloaded the same world. The reload restored the position reached after moving. |
+| Integrated Server | All three sessions saved and stopped normally. |
+
+The M0-08 archive uses the existing reports, hashes and logs for these
+results. The evidence is retained locally outside Git. Paths below are
+relative to the original repository root.
+
+| Local directory | Evidence |
+| --- | --- |
+| `M0-验收/2026-11-18-M0-07-单人世界/` | `中文验收报告.md`, `artifacts/SHA256.txt`, `artifacts/neoforge.mods.toml`, `logs/build.log`, `logs/integrated-server.log`, client logs and screenshots. |
+| `M0-验收/2026-11-18-成品JAR/` | `中文验收报告.md`, `SHA256.txt` and `logs/server-latest.log` for the earlier dedicated-server acceptance. |
+
+### M0 remaining verification
+
+- Dedicated-server acceptance with the M0-07 JAR, including client
+  connection and two-client multiplayer.
+- Full-edition account sign-in and the full-edition single-player
+  new-world creation flow.
+- Automated runtime tests. The M0-07 Gradle build recorded `:test NO-SOURCE`.
+- Long-running stability.
