@@ -1,5 +1,6 @@
 plugins {
     id 'java-library'
+    id 'java-test-fixtures'
     id 'maven-publish'
     id 'net.neoforged.moddev' version '2.0.148'
     id 'idea'
@@ -39,7 +40,7 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
 sourceSets {
     gameTest {
-        compileClasspath += sourceSets.main.output
+        compileClasspath += sourceSets.main.output + sourceSets.testFixtures.output
     }
 }
 
@@ -50,6 +51,8 @@ neoForge {
     // This line is optional. Access Transformers are automatically detected
     // accessTransformers = project.files('src/main/resources/META-INF/accesstransformer.cfg')
 
+    addModdingDependenciesTo sourceSets.testFixtures
+    addModdingDependenciesTo sourceSets.test
     addModdingDependenciesTo sourceSets.gameTest
 
     mods {
@@ -59,6 +62,7 @@ neoForge {
         // A single exploded mod with the same metadata, plus the test subscriber.
         gameTestFixture {
             sourceSet sourceSets.main
+            sourceSet sourceSets.testFixtures
             sourceSet sourceSets.gameTest
         }
     }
@@ -108,6 +112,17 @@ neoForge {
         }
     }
 }
+
+// Keep the project's generated descriptor ahead of loader resources in the JUnit worker.
+sourceSets.test.runtimeClasspath = sourceSets.main.output + sourceSets.test.runtimeClasspath
+tasks.named('test', Test) {
+    // NbtOps initializes the game logger even in a standalone JUnit worker.
+    workingDir = layout.buildDirectory.dir('junit-work').get().asFile
+    doFirst { workingDir.mkdirs() }
+}
+// Test fixtures are development-only, including when publishing the Java component.
+components.java.withVariantsFromConfiguration(configurations.testFixturesApiElements) { skip() }
+components.java.withVariantsFromConfiguration(configurations.testFixturesRuntimeElements) { skip() }
 
 // Sets up a dependency configuration called 'localRuntime'.
 // This configuration should be used instead of 'runtimeOnly' to declare
