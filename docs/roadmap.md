@@ -1,6 +1,6 @@
 # 《未完全死亡》 roadmap
 
-## M0 — engineering bootstrap (implementation complete, merge pending)
+## M0 — engineering bootstrap (complete and merged)
 - [x] Existing GitHub repository and main baseline verified.
 - [x] Isolated `feat/m0-neoforge-bootstrap` branch created.
 - [x] Official Minecraft 26.3 ModDevGradle MDK located; Java 25 target confirmed in template.
@@ -13,14 +13,25 @@
 - [x] Verify the packaged JAR in a standalone client and a dedicated server. See the [verification record](architecture.md#m0-packaged-jar-acceptance-2026-11-18).
 - [x] Open [PR #1](https://github.com/Copule/liminal-dimension-mod/pull/1).
 - [x] M0-06 — Set the in-game display name to `未完全死亡` and document the current development boundary in [AGENTS.md](../AGENTS.md).
-- [ ] Playtest a single-player world with the packaged JAR.
-- [ ] Review and merge PR #1 with owner approval.
+- [x] M0-07 — Verify the packaged JAR in a standalone client's single-player Demo world. See the [acceptance record](architecture.md#m0-07-single-player-world-acceptance-2026-11-18).
+- [x] Merge PR #1 into `main` as [`6c66753`](https://github.com/Copule/liminal-dimension-mod/commit/6c66753169d28401090f73b717bef7770c9b00a9). The [post-merge Build](https://github.com/Copule/liminal-dimension-mod/actions/runs/44323609196) passed.
+
+See [remaining verification](architecture.md#m0-remaining-verification)
+for the scenarios outside M0's completed acceptance.
 
 ## After M0 (requires owner approval)
+
+Before starting M1, obtain owner approval for the final acceptance archive
+and the M1 technical scope. The following are candidate areas for later work.
 - Architecture and persistence prototypes.
 - Dimension loading and spatial graph proof of concept.
 - Death transaction prototype with crash recovery.
 - Gameplay milestones based strictly on the approved complete 72-item requirements.
 
-## Outstanding source
-The complete, original numbered 72-item V1.0 requirement list has not yet been recovered into this repository. Preserve its original wording and numbering when recovered. Do not reconstruct it from summaries.
+## V1.0 requirement source
+
+The complete, original numbered 72-item V1.0 requirement list has been
+recovered and is held in restricted project materials outside this
+repository. Use the approved source with owner-authorized access whenever
+work depends on those requirements. Preserve its original wording and
+numbering.
