@@ -52,6 +52,10 @@ Windows 11 x64 26H2、NTFS、Microsoft OpenJDK 25.0.1+8。NeoForm 的资产下�
 
 专服与 Demo 世界的两轮关服后均未生成 Mod 持久化命名空间。验收目录保存原始 Gradle／JVM 日志、退出状态、XML、命令、关键文件哈希及重入截图。EULA 由项目所有者明确确认，专服全程绑定 `127.0.0.1:25573`。完整的连接证据随 PR 验收记录提供。正版在线认证和双客户端场景需要相应客户端环境。
 
+### 开发客户端与回环连接
+
+本地验收以 `gradlew.bat --offline --no-daemon --console=plain -I <本地 init 脚本> runClient` 启动，Gradle 退出 0。FML 报告 `CLIENT in DEV` 并初始化两入口。首次连接实际抵达专服，由 26.3 默认开启的白名单拒绝。加入临时白名单的合成开发用户随后从 `127.0.0.1` 两次登录同一个生产专服进程，源端口不同；两侧日志与界面共同确认加入、断开、重连、再次断开。之后专服成功保存并退出 0，恢复在线认证设置及空白名单。本次回环用例使用本地开发身份。
+
 ### GitHub Ubuntu
 
 沿用现有 `.github/workflows/build.yml`。工作流在 Ubuntu Runner 上执行 `./gradlew --no-daemon --console=plain --continue build runGameTestServer`，保留 JUnit 与 GameTest XML 为 `project-test-reports`。专服生命周期由本地生产环境验收，CI 沿用无需人工接受服务器 EULA 的原生 GameTest。
