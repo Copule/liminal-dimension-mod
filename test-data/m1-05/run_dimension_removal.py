@@ -57,7 +57,7 @@ def snapshot(world, phase, archive=False):
             if name.startswith("level.dat"):
                 data = tag["Data"]
                 keys = ("DataVersion", "Version", "DataPacks", "enabled_features", "WorldGenSettings",
-                        "LastPlayed", "Time", "DayTime", "Spawn", "initialized")
+                        "LastPlayed", "Time", "DayTime", "spawn", "initialized")
                 tag = {key: data[key].snbt() for key in keys if key in data}
             else:
                 data = tag.get("data")
@@ -138,7 +138,8 @@ class Console:
         self.loaded(dimension)
         if create:
             self.command(f"execute in {dimension} run setblock {COORDS} minecraft:{block}", "Changed the block")
-        self.command(f"execute in {dimension} if block {COORDS} minecraft:{block}", "Test passed")
+        line = self.command(f"execute in {dimension} if block {COORDS} minecraft:{block}", "Test passed|Test failed")
+        require("Test passed" in line, line)
 
     def tickets(self, dimension, *, extra, create):
         if create:
@@ -167,7 +168,9 @@ def configure(runtime, world, preinstalled, port, preset):
 
 
 def run_phase(args, name, world_name, *, vanilla=False, pack=False, preinstalled=False,
-              create_overworld=False, create_probe=False, removal=False, preset=None):
+              create_overworld=False, create_probe=False, expect_probe=None, preset=None):
+    if expect_probe is None:
+        expect_probe = pack
     phase = args.evidence / name
     phase.mkdir()
     world = args.runtime / world_name
@@ -191,7 +194,8 @@ def run_phase(args, name, world_name, *, vanilla=False, pack=False, preinstalled
         if old.exists():
             old.rename(phase / f"prior-{filename}")
     print(f"{name}: launching", flush=True)
-    result = {"ready": False, "exit_code": None, "probes_passed": False, "forced_termination": False}
+    result = {"ready": False, "exit_code": None, "probes_passed": False,
+              "forced_termination": False, "probe_registered": None}
     process = subprocess.Popen(argv, cwd=args.runtime, env=env, stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding="utf-8", errors="replace")
     console = Console(process, phase / "probes.txt")
@@ -204,16 +208,15 @@ def run_phase(args, name, world_name, *, vanilla=False, pack=False, preinstalled
         require((PACK_ID in pack_response) == pack, pack_response)
         console.tickets(OVERWORLD, extra=False, create=create_overworld)
         console.block(OVERWORLD, "gold_block", create_overworld)
-        if pack:
+        unknown_probe = f"Unknown dimension '{PROBE}'"
+        line = console.command(f"execute in {PROBE} if loaded {COORDS}",
+                               rf"{re.escape(unknown_probe)}|Test passed|Test failed")
+        result["probe_registered"] = unknown_probe not in line
+        require(result["probe_registered"] == expect_probe,
+                f"Expected probe_registered={expect_probe} for {PROBE}, got {result['probe_registered']}. {line}")
+        if result["probe_registered"]:
             console.tickets(PROBE, extra=True, create=create_probe)
             console.block(PROBE, "emerald_block", create_probe)
-            result["probe_registered"] = True
-        else:
-            line = console.command(f"execute in {PROBE} if loaded {COORDS}", "Unknown dimension|Test passed|Test failed")
-            result["probe_registered"] = "Unknown dimension" not in line
-            if result["probe_registered"]:
-                console.tickets(PROBE, extra=True, create=False)
-                console.block(PROBE, "emerald_block", False)
         console.command("save-all flush", "Saved the game")
         result["probes_passed"] = True
     except (EOFError, RuntimeError, TimeoutError) as exc:
@@ -238,10 +241,8 @@ def run_phase(args, name, world_name, *, vanilla=False, pack=False, preinstalled
         write_json(phase / "result.json", result)
     files = snapshot(world, phase, archive=not name.endswith("rollback"))
     print(f"{name}: ready={result['ready']}, probes={result['probes_passed']}, exit={result['exit_code']}", flush=True)
-    require(not result["forced_termination"], f"Inspect {phase / 'result.json'}")
-    if not removal:
-        require(result["probes_passed"] and result["exit_code"] == 0 and not result["forced_termination"],
-                f"Inspect {phase / 'result.json'}")
+    require(result["ready"] and result["probes_passed"] and result["exit_code"] == 0
+            and not result["forced_termination"], f"{name} failed. Inspect {phase / 'result.json'}")
     return files
 
 
@@ -260,7 +261,7 @@ def remove_and_restore(args, prefix, world_name):
     before = args.evidence / f"{prefix}-before-removal-boot"
     before.mkdir()
     snapshot(world, before)
-    after_removal = run_phase(args, f"{prefix}03-removed", world_name, removal=True)
+    after_removal = run_phase(args, f"{prefix}03-removed", world_name)
     install_pack(parked, world)
     restored_input = args.evidence / f"{prefix}-before-restored-boot"
     restored_input.mkdir()
