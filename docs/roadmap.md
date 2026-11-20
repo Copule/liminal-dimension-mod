@@ -23,11 +23,12 @@ for the scenarios outside M0's completed acceptance.
 
 - [x] M1-01 — JUnit, native GameTest, report verification and Ubuntu CI. Merged in [PR #3](https://github.com/Copule/liminal-dimension-mod/pull/3). See [test infrastructure](m1-01-testing.md).
 - [x] M1-02 — Versioned snapshot persistence and safe publication. Merged in [PR #4](https://github.com/Copule/liminal-dimension-mod/pull/4). See [persistence](m1-02-persistence.md) and the [post-merge Build](https://github.com/Copule/liminal-dimension-mod/actions/runs/44537997459).
-- [ ] M1-03 — Physical client and dedicated-server isolation, packaged JAR checks and runtime acceptance. Pending PR review and owner-approved merge. See [side isolation](m1-03-side-isolation.md).
+- [x] M1-03 — Physical client and dedicated-server isolation, packaged JAR checks and runtime acceptance. Merged in [PR #5](https://github.com/Copule/liminal-dimension-mod/pull/5). See [side isolation](m1-03-side-isolation.md) and the [post-merge Build](https://github.com/Copule/liminal-dimension-mod/actions/runs/44661441426).
+- [ ] M1-04 — Isolated data pack dimension loading proof of concept. Pending review and owner-approved merge. See [dimension proof of concept](m1-04-dimension-poc.md).
 
 ## Later work (requires owner approval)
 
-- Dimension loading and spatial graph proof of concept.
+- Spatial graph proof of concept.
 - Death transaction prototype with crash recovery.
 - Gameplay milestones based strictly on the approved complete 72-item requirements.
 
