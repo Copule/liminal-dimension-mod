@@ -19,11 +19,14 @@
 See [remaining verification](architecture.md#m0-remaining-verification)
 for the scenarios outside M0's completed acceptance.
 
-## After M0 (requires owner approval)
+## M1 — architecture and infrastructure
 
-Before starting M1, obtain owner approval for the final acceptance archive
-and the M1 technical scope. The following are candidate areas for later work.
-- Architecture and persistence prototypes.
+- [x] M1-01 — JUnit, native GameTest, report verification and Ubuntu CI. Merged in [PR #3](https://github.com/Copule/liminal-dimension-mod/pull/3). See [test infrastructure](m1-01-testing.md).
+- [x] M1-02 — Versioned snapshot persistence and safe publication. Merged in [PR #4](https://github.com/Copule/liminal-dimension-mod/pull/4). See [persistence](m1-02-persistence.md) and the [post-merge Build](https://github.com/Copule/liminal-dimension-mod/actions/runs/44537997459).
+- [ ] M1-03 — Physical client and dedicated-server isolation, packaged JAR checks and runtime acceptance. Pending PR review and owner-approved merge. See [side isolation](m1-03-side-isolation.md).
+
+## Later work (requires owner approval)
+
 - Dimension loading and spatial graph proof of concept.
 - Death transaction prototype with crash recovery.
 - Gameplay milestones based strictly on the approved complete 72-item requirements.
