@@ -24,7 +24,8 @@ for the scenarios outside M0's completed acceptance.
 - [x] M1-01 — JUnit, native GameTest, report verification and Ubuntu CI. Merged in [PR #3](https://github.com/Copule/liminal-dimension-mod/pull/3). See [test infrastructure](m1-01-testing.md).
 - [x] M1-02 — Versioned snapshot persistence and safe publication. Merged in [PR #4](https://github.com/Copule/liminal-dimension-mod/pull/4). See [persistence](m1-02-persistence.md) and the [post-merge Build](https://github.com/Copule/liminal-dimension-mod/actions/runs/44537997459).
 - [x] M1-03 — Physical client and dedicated-server isolation, packaged JAR checks and runtime acceptance. Merged in [PR #5](https://github.com/Copule/liminal-dimension-mod/pull/5). See [side isolation](m1-03-side-isolation.md) and the [post-merge Build](https://github.com/Copule/liminal-dimension-mod/actions/runs/44661441426).
-- [ ] M1-04 — Isolated data pack dimension loading proof of concept. Pending review and owner-approved merge. See [dimension proof of concept](m1-04-dimension-poc.md).
+- [x] M1-04 — Isolated data pack dimension loading proof of concept. Merged in [PR #6](https://github.com/Copule/liminal-dimension-mod/pull/6) as `954a244`. [main Build #28](https://github.com/Copule/liminal-dimension-mod/actions/runs/44676419025) passed. See [dimension proof of concept](m1-04-dimension-poc.md).
+- [ ] M1-05 — Dimension data pack removal and save recovery verification. Pending Gemini 4 Neon High independent review and owner-approved merge. See [dimension removal and recovery](m1-05-dimension-removal.md).
 
 ## Later work (requires owner approval)
 
