@@ -77,6 +77,17 @@ class ProductionJarTest {
     }
 
     @Test
+    void productionJarExcludesTheDimensionTestPack() throws IOException {
+        try (var jar = openJar()) {
+            var fixtureEntries = jar.stream().map(entry -> entry.getName())
+                    .filter(name -> name.contains("data/liminal_dimension_poc/")
+                            || name.contains("m1-04-dimension-poc/"))
+                    .sorted().toList();
+            assertTrue(fixtureEntries.isEmpty(), () -> "Dimension test pack leaked into production: " + fixtureEntries);
+        }
+    }
+
+    @Test
     void productionClassesRespectPhysicalSideBoundaries() throws IOException {
         var entrypoints = new TreeSet<String>();
         var violations = new TreeSet<String>();

@@ -1,0 +1,7 @@
+{
+  "pack": {
+    "description": "M1-04 dimension loading test fixture",
+    "min_format": [121, 0],
+    "max_format": [121, 0]
+  }
+}
