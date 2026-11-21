@@ -13,3 +13,6 @@ technology and necessary test infrastructure.
 
 See the [roadmap](docs/roadmap.md) for milestone status and the
 [architecture notes](docs/architecture.md) for build and verification results.
+
+If you are working on the repository, start with the [agent guide](AGENTS.md)
+and open only the relevant section of the [documentation map](docs/index.md).
