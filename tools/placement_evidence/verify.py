@@ -3,6 +3,8 @@
 import argparse
 from hashlib import sha256
 import json
+from math import isfinite
+from os import fstat
 from pathlib import Path
 import re
 import stat
@@ -18,10 +20,19 @@ WORLD_MARKERS = (" logged in with entity id ", " joined the game")
 LINE = re.compile(r"\[\d{2}:\d{2}:\d{2}\] \[(?P<thread>[^\]/]{1,100})/INFO\](?: \[(?P<logger>[^\]]+)\])?: (?P<message>.*)")
 UUID_LOG = re.compile(r"UUID of player ([A-Za-z0-9_]{1,16}) is ([0-9a-f-]{36})")
 CONFIG = re.compile(r"([A-Za-z0-9_]{1,16}) \(([0-9a-f-]{36})\) lost connection: (.*)")
-PLACED = re.compile(r"([A-Za-z0-9_]{1,16})\[(/127\.0\.0\.1:[0-9]{1,5})\] logged in with entity id [0-9]+ at \([^\r\n]+\)")
+COORD = r"([-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[Ee][-+]?[0-9]{1,4})?)"
+PLACED = re.compile(
+    r"([A-Za-z0-9_]{1,16})\[/127\.0\.0\.1:([0-9]{1,5})\] logged in with entity id [0-9]+ at \("
+    + ", ".join([COORD] * 3) + r"\)"
+)
 JOINED = re.compile(r"([A-Za-z0-9_]{1,16}) joined the game")
 ONLINE = re.compile(r"There are ([0-9]+) of a max of ([0-9]+) players online: *(.*)")
 READY = re.compile(r'Done \([0-9.]+s\)! For help, type "help"')
+OTHER_CORE_MARKER = re.compile(
+    r"UUID of player |\([0-9a-fA-F-]{36}\) lost connection: |"
+    r"There are [0-9]+ of a max of [0-9]+ players online: |"
+    r'Done \([^\r\n]*\)! For help, type "help"|(?:^|: )Stopping server$'
+)
 LIMIT_LOG = 16 * 1024 * 1024
 LIMIT_JSON = 4 * 1024 * 1024
 
@@ -38,12 +49,16 @@ def require(condition, code):
 def read_bytes(root, name, limit):
     path = root / name
     before = path.lstat()
-    require(stat.S_ISREG(before.st_mode) and path.resolve(strict=True) == path and before.st_size <= limit,
+    require(stat.S_ISREG(before.st_mode) and before.st_nlink == 1
+            and path.resolve(strict=True) == path and before.st_size <= limit,
             "FILE_UNSUPPORTED")
+    signature = lambda info: (info.st_dev, info.st_ino, info.st_mode, info.st_nlink,
+                              info.st_size, info.st_mtime_ns, info.st_ctime_ns)
     with path.open("rb") as stream:
+        require(signature(fstat(stream.fileno())) == signature(before), "FILE_UNSTABLE")
         data = stream.read(limit + 1)
+        require(signature(fstat(stream.fileno())) == signature(before), "FILE_UNSTABLE")
     after = path.lstat()
-    signature = lambda info: (info.st_dev, info.st_ino, info.st_mode, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
     require(signature(before) == signature(after) and len(data) == before.st_size, "FILE_UNSTABLE")
     return data
 
@@ -119,7 +134,9 @@ def parse_log(text):
                                                       or class_logger(logger, "DedicatedServer")):
                     events.append(("stop",))
                     continue
-                if (result := PLACED.fullmatch(message)) and class_logger(logger, "PlayerList"):
+                if ((result := PLACED.fullmatch(message)) and class_logger(logger, "PlayerList")
+                        and 1 <= int(result[2]) <= 65535
+                        and all(isfinite(float(coord)) for coord in result.groups()[2:])):
                     events.append(("place", result[1]))
                     continue
                 if (result := JOINED.fullmatch(message)) and (class_logger(logger, "MinecraftServer")
@@ -141,6 +158,8 @@ def parse_log(text):
         # untested prefixes, address settings, locale variants or logger names.
         if any(marker in line for marker in WORLD_MARKERS):
             events.append(("unparsed_world",))
+        if DENIAL in line or OTHER_CORE_MARKER.search(line):
+            events.append(("unparsed_core",))
         if "/ERROR]" in line or "/FATAL]" in line:
             events.append(("server_error",))
     return events
@@ -159,6 +178,8 @@ def check_log(text, player, player_id, trial):
         missing.append("SERVER_ERROR_PRESENT")
     if "unparsed_world" in tags:
         missing.append("WORLD_EVENT_FORMAT_UNSUPPORTED")
+    if "unparsed_core" in tags:
+        missing.append("CORE_EVENT_FORMAT_UNSUPPORTED")
     if trial == "negative" and world:
         failed.append("NEGATIVE_WORLD_EVENT")
     if len(auth) != 1 or auth[0] != ("auth", player, player_id):

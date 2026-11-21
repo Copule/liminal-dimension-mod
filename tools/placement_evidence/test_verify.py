@@ -2,6 +2,7 @@ import contextlib
 from hashlib import sha256
 import io
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -115,6 +116,24 @@ class PairedEvidence(unittest.TestCase):
         self.log("negative", READY, AUTH, "unsupported " + JOIN, DENIED, ZERO, STOP)
         self.has("WORLD_EVENT_FORMAT_UNSUPPORTED", 2)
 
+    def test_extra_core_events_under_unrecognized_prefix_cannot_clear(self):
+        for trial, good in (("positive", (READY, AUTH, PLACED, JOIN)),
+                            ("negative", (READY, AUTH, DENIED, ZERO))):
+            for extra in (DENIED.replace("/INFO]", "/WARN]"), AUTH.replace("User Authenticator #1", "Other"),
+                          ZERO.replace("are 0", "are 1").replace("/INFO]", "/WARN]"),
+                          READY.replace("/INFO]", "/WARN]"), STOP.replace("/INFO]", "/WARN]")):
+                with self.subTest(trial=trial, extra=extra):
+                    self.log(trial, *good, extra, STOP)
+                    self.has("CORE_EVENT_FORMAT_UNSUPPORTED", 2)
+            self.log(trial, *good, STOP)
+
+    def test_placement_requires_valid_port_and_finite_coordinates(self):
+        for line in (PLACED.replace("55001", "99999"), PLACED.replace("55001", "0"),
+                     PLACED.replace("2.0", "arbitrary"), PLACED.replace("2.0", "1e9999")):
+            with self.subTest(line=line):
+                self.log("positive", READY, AUTH, line, JOIN, STOP)
+                self.has("WORLD_EVENT_FORMAT_UNSUPPORTED", 2)
+
     def test_zero_players_required_after_denial(self):
         self.log("negative", READY, AUTH, ZERO, DENIED, STOP)
         self.has("NEGATIVE_ZERO_ONLINE_AFTER_DENIAL_UNPROVEN", 2)
@@ -181,6 +200,13 @@ class PairedEvidence(unittest.TestCase):
             artifact.symlink_to(target)
         except OSError:
             return
+        self.has("FILE_UNSUPPORTED", 2)
+
+    def test_hardlinked_evidence_is_rejected(self):
+        try:
+            os.link(self.root / "negative-before.json", self.root / "alias.json")
+        except OSError:
+            self.skipTest("hard link unavailable")
         self.has("FILE_UNSUPPORTED", 2)
 
     def test_auth_mode_or_setup_drift_cannot_clear(self):
