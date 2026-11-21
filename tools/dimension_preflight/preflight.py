@@ -2,7 +2,6 @@
 """Read-only preflight for removing dimensions from a stopped Java 26.3 dedicated-server copy."""
 
 import argparse
-import gzip
 from io import BytesIO
 import json
 from pathlib import Path
@@ -23,6 +22,12 @@ ARRAY = {7: 1, 11: 4, 12: 8}
 
 class InvalidInput(ValueError):
     """An input could not be verified."""
+
+
+class _ArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        # argparse's default writes unknown switches/operands verbatim.
+        raise InvalidInput("invalid arguments; use --help") from None
 
 
 def _mutf8(data):
@@ -139,10 +144,18 @@ def _plain(path, check):
 def _nbt(path, fields):
     if _plain(path, stat.S_ISREG).st_size > MAX_NBT:
         raise InvalidInput("compressed NBT size exceeds limit")
-    with gzip.open(path, "rb") as compressed:
-        data = compressed.read(MAX_NBT + 1)
+    with path.open("rb") as source:
+        encoded = source.read(MAX_NBT + 1)
+    if len(encoded) > MAX_NBT:
+        raise InvalidInput("compressed NBT size exceeds limit")
+    # zlib validates the optional gzip header CRC as well as the trailer.
+    # Accept one complete member; do not clear an ambiguous or truncated file.
+    inflater = zlib.decompressobj(16 + zlib.MAX_WBITS)
+    data = inflater.decompress(encoded, MAX_NBT + 1)
     if len(data) > MAX_NBT:
         raise InvalidInput("expanded NBT size exceeds limit")
+    if not inflater.eof or inflater.unused_data or inflater.unconsumed_tail:
+        raise InvalidInput("expected one complete gzip member")
     return _NBT(data).root(fields)
 
 
@@ -156,7 +169,7 @@ def _inventory(path):
     return set(values)
 
 
-def scan(world, target_inventory, show_files=False):
+def scan(world, target_inventory, show_files=False, show_dimensions=False):
     """Classify references without changing the copy. Inputs are assumed stopped and stable."""
     target = _inventory(target_inventory)
     _plain(world, stat.S_ISDIR)
@@ -195,7 +208,8 @@ def scan(world, target_inventory, show_files=False):
                     result["status"] = "UNVERIFIED_DIMENSION"
                 elif root["Dimension"] not in target:
                     result["status"] = "DIMENSION_MISSING"
-                    result["dimension"] = root["Dimension"]
+                    if show_dimensions:
+                        result["dimension"] = root["Dimension"]
                 else:
                     result["status"] = "REFERENCE_PRESENT"
             except (OSError, ValueError, EOFError, zlib.error):
@@ -205,13 +219,14 @@ def scan(world, target_inventory, show_files=False):
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = _ArgumentParser(description=__doc__)
     parser.add_argument("world", type=Path, help="stopped dedicated-server world COPY root")
     parser.add_argument("target_inventory", type=Path, help="JSON array of effective post-change dimension IDs")
     parser.add_argument("--show-files", action="store_true", help="locally disclose player filenames (UUIDs)")
-    args = parser.parse_args(argv)
+    parser.add_argument("--show-dimensions", action="store_true", help="locally disclose missing dimension IDs")
     try:
-        findings = scan(args.world, args.target_inventory, args.show_files)
+        args = parser.parse_args(argv)
+        findings = scan(args.world, args.target_inventory, args.show_files, args.show_dimensions)
     except (OSError, ValueError, EOFError, RecursionError, zlib.error) as exc:
         # Avoid printing paths, UUIDs, or file contents by default.
         reason = str(exc) if isinstance(exc, InvalidInput) else type(exc).__name__

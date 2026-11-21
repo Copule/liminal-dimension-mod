@@ -5,9 +5,12 @@ from io import StringIO
 import json
 from pathlib import Path
 import struct
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+import zlib
 
 import preflight as p
 
@@ -106,6 +109,25 @@ class PreflightTest(unittest.TestCase):
         file.write_bytes(damaged)
         self.single("UNREADABLE_PRIMARY")
 
+    def test_optional_gzip_header_crc_must_match(self):
+        file = self.put(_root(_version(), _dimension(OVERWORLD)))
+        self.put(_root(_version(), _dimension(PROBE)), PLAYER + ".dat_old")
+        encoded = file.read_bytes()
+        header = bytearray(encoded[:10])
+        header[3] |= 2  # FHCRC
+        valid_crc = zlib.crc32(header) & 0xffff
+        file.write_bytes(header + struct.pack("<H", valid_crc) + encoded[10:])
+        self.single("REFERENCE_PRESENT")
+        file.write_bytes(header + struct.pack("<H", valid_crc ^ 1) + encoded[10:])
+        self.single("UNREADABLE_PRIMARY")
+
+    def test_extra_gzip_member_or_incomplete_trailer_blocks(self):
+        file = self.put(_root(_version(), _dimension(OVERWORLD)))
+        encoded = file.read_bytes()
+        for altered in (encoded + gzip.compress(b""), encoded + b"\x00", encoded[:-1]):
+            file.write_bytes(altered)
+            self.single("UNREADABLE_PRIMARY")
+
     def test_truncated_nbt_inside_valid_gzip_blocks(self):
         self.put(_root(_version(), _dimension(OVERWORLD))[:-1])
         self.single("UNREADABLE_PRIMARY")
@@ -185,6 +207,23 @@ class PreflightTest(unittest.TestCase):
         self.assertEqual([r["record"] for r in report["records"]], [1, 2])
         self.assertEqual(self.result("--show-files")[1]["records"][0]["file"], PLAYER + ".dat")
         self.assertEqual(digest(), before)
+
+    def test_dimension_ids_only_appear_with_opt_in(self):
+        missing = "custom:rooms/" + PLAYER
+        self.put(_root(_version(), _dimension(missing)))
+        self.single("DIMENSION_MISSING")
+        self.assertNotIn("dimension", self.result("--show-files")[1]["records"][0])
+        record = self.result("--show-dimensions")[1]["records"][0]
+        self.assertEqual(record["dimension"], missing)
+        self.assertNotIn("file", record)
+
+    def test_cli_argument_error_is_json_without_raw_operands(self):
+        run = subprocess.run([sys.executable, str(Path(p.__file__)), str(self.world),
+                              str(self.inventory), "/private/SENTINEL.dat"],
+                             capture_output=True, text=True, timeout=10)
+        self.assertEqual(run.returncode, 2)
+        self.assertEqual(json.loads(run.stdout)["status"], "INPUT_UNVERIFIED")
+        self.assertNotIn("SENTINEL", run.stdout + run.stderr)
 
     def test_expanded_resource_limit_blocks(self):
         oversized = _field(7, "padding", struct.pack(">i", 600) + bytes(600))
