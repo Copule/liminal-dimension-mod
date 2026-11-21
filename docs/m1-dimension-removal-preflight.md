@@ -36,3 +36,7 @@ M1-06 的实机结果证明：维度未注册时，原版可先选回退世界�
 ```sh
 python -m unittest discover -s tools/dimension_preflight -v
 ```
+
+## Windows 实机存档副本对照（2026-11-21）
+
+在 Windows 上使用先前真实受认证生存补验的**移包前归档**，另行解压成只读检查对象，并按清单验证 53 个文件。用同一份副本和同一版预检程序做两次检查：移包后已核对的目标清单不含探针维度时，返回退出码 `1` / `BLOCK` / `DIMENSION_MISSING`；装包对照清单包含探针时，返回 `0` / `NO_MISSING_REFERENCES_FOUND` / `REFERENCE_PRESENT`。两次运行后副本 53 个文件和来源归档的哈希均未变。这验证的是预检能挡住已观察到的风险样本，不是运行时落点保护；不公开玩家标识或原始玩家档。
