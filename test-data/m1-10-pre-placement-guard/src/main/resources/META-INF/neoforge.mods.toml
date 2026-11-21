@@ -1,0 +1,19 @@
+license="All Rights Reserved"
+
+[[mods]]
+modId="liminal_placement_fixture"
+version="0.1.0"
+displayName="Liminal pre-placement test fixture"
+description="Isolated opt-in probe. Not part of the production Liminal Dimension mod."
+
+[[dependencies.liminal_placement_fixture]]
+modId="neoforge"
+type="required"
+versionRange="[26.3.0.113]"
+side="SERVER"
+
+[[dependencies.liminal_placement_fixture]]
+modId="minecraft"
+type="required"
+versionRange="[26.3]"
+side="SERVER"
