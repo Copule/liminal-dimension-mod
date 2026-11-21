@@ -1,0 +1,19 @@
+license="All Rights Reserved"
+
+[[mods]]
+modId="liminal_placement_integration"
+version="0.1.0"
+displayName="Liminal authenticated placement experiment"
+description="Opt-in dedicated-server experiment with a one-connection lifetime."
+
+[[dependencies.liminal_placement_integration]]
+modId="neoforge"
+type="required"
+versionRange="[26.3.0.113]"
+side="SERVER"
+
+[[dependencies.liminal_placement_integration]]
+modId="minecraft"
+type="required"
+versionRange="[26.3]"
+side="SERVER"
