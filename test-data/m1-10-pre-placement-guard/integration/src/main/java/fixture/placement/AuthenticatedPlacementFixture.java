@@ -160,9 +160,14 @@ public final class AuthenticatedPlacementFixture {
                 return null;
             }
             var profile = ((ServerConfigurationPacketListenerImpl) listener).getOwner();
+            if (profile == null || !PlacementScope.isSoleWhitelistedIdentity(server.enforceSecureProfile(),
+                    server.isUsingWhitelist(), server.isEnforceWhitelist(), profile.id(),
+                    server.getPlayerList().getWhiteList().getEntries())) {
+                return null;
+            }
             Path world = PlacementScope.experimentWorld(Path.of("").toAbsolutePath(),
                     server.getWorldPath(LevelResource.PLAYER_DATA_DIR));
-            if (profile == null || profile.id() == null || world == null) {
+            if (world == null) {
                 return null;
             }
             var loaded = server.levelKeys().stream().map(ResourceKey::identifier).collect(Collectors.toUnmodifiableSet());

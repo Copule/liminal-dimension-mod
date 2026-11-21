@@ -11,6 +11,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.UUID;
+import net.minecraft.server.players.UserWhiteListEntry;
 
 import static java.nio.file.LinkOption.NOFOLLOW_LINKS;
 
@@ -39,6 +42,16 @@ final class PlacementScope {
     static boolean hasAuthentication(boolean configuredOnline, boolean authenticationInUse,
             boolean singleplayerProfile, boolean encrypted, boolean acceptsTransfers) {
         return configuredOnline && authenticationInUse && !singleplayerProfile && encrypted && !acceptsTransfers;
+    }
+
+    static boolean isSoleWhitelistedIdentity(boolean secureProfile, boolean whitelistEnabled,
+            boolean whitelistEnforced, UUID player, Collection<UserWhiteListEntry> entries) {
+        if (!secureProfile || !whitelistEnabled || !whitelistEnforced || player == null || entries.size() != 1) {
+            return false;
+        }
+        // Only the explicit stored entry counts. PlayerList.isWhiteListed also allows operators.
+        var entry = entries.iterator().next();
+        return entry != null && entry.getUser() != null && player.equals(entry.getUser().id());
     }
 
     static Path experimentWorld(Path workingDirectory, Path authoritativePlayerData) {

@@ -17,9 +17,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.resources.Identifier;
+import net.minecraft.server.players.NameAndId;
+import net.minecraft.server.players.UserWhiteListEntry;
 
 public final class PlacementIntegrationProbe {
     private static final UUID PLAYER = UUID.fromString("00000000-0000-4000-8000-000000000001");
@@ -33,6 +37,7 @@ public final class PlacementIntegrationProbe {
 
     public static void main(String[] args) throws Exception {
         verifyIsolation();
+        verifyWhitelistReadBoundary();
         verifySyntheticStorage();
         verifyDecisions();
         verifyFailures();
@@ -83,6 +88,54 @@ public final class PlacementIntegrationProbe {
     private static InetSocketAddress socket(int a, int b, int c, int d) throws Exception {
         return new InetSocketAddress(InetAddress.getByAddress(new byte[] {(byte) a, (byte) b, (byte) c, (byte) d}),
                 25565);
+    }
+
+    private static void verifyWhitelistReadBoundary() {
+        var listed = new UserWhiteListEntry(new NameAndId(PLAYER, "fixture"));
+        var wrongIdSameName = new UserWhiteListEntry(new NameAndId(new UUID(0, 2), "fixture"));
+        var sole = List.of(listed);
+        verifyWhitelistCase(true, true, true, PLAYER, sole, true);
+        verifyWhitelistCase(false, true, true, PLAYER, sole, false);
+        verifyWhitelistCase(true, false, true, PLAYER, sole, false);
+        verifyWhitelistCase(true, true, false, PLAYER, sole, false);
+        verifyWhitelistCase(true, true, true, PLAYER, List.of(), false);
+        verifyWhitelistCase(true, true, true, PLAYER, List.of(wrongIdSameName), false);
+        verifyWhitelistCase(true, true, true, PLAYER, List.of(listed, wrongIdSameName), false);
+        verifyWhitelistCase(true, true, true, null, sole, false);
+
+        var entries = new AtomicReference<>(sole);
+        var status = new ArrayList<Outcome>();
+        var disconnects = new ArrayList<Outcome>();
+        var admission = new PlacementAdmission(DEADLINE, status::add, disconnects::add);
+        Supplier<Input> capture = () ->
+                PlacementScope.isSoleWhitelistedIdentity(true, true, true, PLAYER, entries.get()) ? INPUT : null;
+        var pending = new CompletableFuture<Status>();
+        check(!admission.tick(0, () -> true, capture, input -> pending), "sole identity begins pending check");
+        entries.set(List.of(wrongIdSameName));
+        pending.complete(Status.DIMENSION_LOADED);
+        check(!admission.tick(1, () -> true, capture, input -> pending), "revoked identity cannot release queue");
+        check(status.equals(List.of(Outcome.UNCONFIRMED)) && disconnects.equals(status),
+                "revocation reports one unconfirmed refusal");
+    }
+
+    private static void verifyWhitelistCase(boolean secureProfile, boolean whitelistEnabled, boolean whitelistEnforced,
+            UUID player, List<UserWhiteListEntry> entries, boolean expected) {
+        var submissions = new AtomicInteger();
+        var status = new ArrayList<Outcome>();
+        var disconnects = new ArrayList<Outcome>();
+        var admission = new PlacementAdmission(DEADLINE, status::add, disconnects::add);
+        Supplier<Input> capture = () -> PlacementScope.isSoleWhitelistedIdentity(
+                secureProfile, whitelistEnabled, whitelistEnforced, player, entries) ? INPUT : null;
+        var result = CompletableFuture.completedFuture(Status.NO_PLAYER_DATA);
+        check(!admission.tick(0, () -> true, capture, input -> {
+            submissions.incrementAndGet();
+            return result;
+        }), "authorization check cannot advance the queue");
+        check(submissions.get() == (expected ? 1 : 0), "only the explicit sole identity may submit I/O");
+        check(admission.tick(1, () -> true, capture, input -> result) == expected, "whitelist decision mismatch");
+        var wanted = expected ? Outcome.NO_PLAYER_DATA : Outcome.UNCONFIRMED;
+        check(status.equals(List.of(wanted)) && disconnects.equals(expected ? List.of() : List.of(wanted)),
+                "whitelist decision reports one terminal status");
     }
 
     private static void verifySyntheticStorage() throws Exception {

@@ -15,6 +15,8 @@
 ## 运行边界
 
 - 单独的实验 JAR 只注册专服入口。必须设置 `-Dliminal.placement.integration.enabled=true`，且专服必须明确以 `server-ip=127.0.0.1` 启动。连接须为非内存 TCP，服务端实际端点和对端均须解析为准确的 IPv4 `127.0.0.1`。未启用或超出网络范围时不注册探针。此实验假定没有代理、转发、修改认证或配置队列的其他模组。
+- 提交读取前和使用结果前，均要求专服的 `enforceSecureProfile()`、`isUsingWhitelist()` 和 `isEnforceWhitelist()` 返回 true。对应设置为 `enforce-secure-profile=true`、`white-list=true` 和 `enforce-whitelist=true`。安全档案使用专服的有效状态，目标实现还要求在线模式和服务端可校验档案密钥。实验未在配置阶段独立验证逐客户端的聊天档案密钥。
+- 通过 `PlayerList.getWhiteList().getEntries()` 只在 tick 检查服务端内存中的明确白名单项。目标版本的 `StoredUserList.getEntries()` 返回当前存储项集合，`UserWhiteList` 使用 UUID 键。必须恰有一项且 UUID 与已认证 profile 匹配，管理员状态、临时许可和名字均不作为读取许可，也不重新加载白名单文件。提交前检查失败时返回 `UNCONFIRMED`，不提交 I/O 或占用一次性读取预算。结果核对时若许可已变化，则丢弃结果。
 - 权威路径来自 `MinecraftServer.getWorldPath(LevelResource.PLAYER_DATA_DIR)`，其底层使用当前专服的 `LevelStorageAccess`。`LevelResource.ROOT` 在该版本附加 `.`，因此使用不含该别名的 `PLAYER_DATA_DIR`。路径必须逐字对应服务器工作目录下的 `placement-integration-world/players/data`，不对点段做词法归一化。目录需使用绝对的 universe 路径。I/O 线程单独校验世界根实际路径及 `.liminal-placement-experiment` 普通文件，内容必须为 ASCII `liminal-placement-integration-v1` 加 LF。标记只用于一次性合成世界。探针不接收客户端或配置提供的扫描路径。
 - 服务器 tick 捕获资料 ID、世界根及 `MinecraftServer.levelKeys()` 中实际已加载维度的不可变快照。工作线程仅接收快照，不访问游戏对象。每个实验进程至多提交一次读取，工作池为单线程且无等待队列。快照前后要求当前监听器一致、无在场玩家、无其他已连接会话、主世界已加载。后续会话不能复用第一次结果。结果回到服务器 tick 后重新核验输入。3 秒单调时限内只用 `Future.state()` 和 `resultNow()`，读档超时后取消并丢弃结果。底层文件系统操作可能无法被中断，由单个守护读取线程和一次性预算隔离。 [Java 25 Future API](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/concurrent/Future.html)
 - 每次对照都使用新的、调用方控制且无其他写入者的合成目录和专服进程。首次任务后的普通游戏流程仍归原版。配置阶段无法锁住到放置阶段之间的文件变化，而且原版重复登录处理可能先于本任务运行。路径替换、外部写入者、重复账号竞态和已放置玩家的再配置没有运行时验证。此处的防护只适用于受控实验，未来接入需要新的评审和证据。
@@ -37,4 +39,4 @@ Java 25，仓库根目录执行。两个命令只编译及运行合成探针或�
 ./gradlew --no-daemon --console=plain -p test-data/m1-10-pre-placement-guard/integration build
 ```
 
-Windows 使用 `gradlew.bat`。设 `CI=true` 可走目标 NeoForge 的二进制补丁构建路径，校验的仍然是 Minecraft 26.3 / NeoForge 26.3.0.113 / Java 25。集成构建运行独立 `probe` 源集的 `integrationProbe`，用临时合成主档验证四种状态，并模拟未知异常、超时、重复注册、快照失配和普通断线。本机 Temurin 25.0.5.1+2 的集成构建通过 86 项合成断言，同一选项下根项目 `build` 通过 87 项 JUnit，0 失败、0 跳过。没有使用真实账号、真实存档或实机联机，合成用例不证明真实连接、并发安全或运行时磁盘行为。
+Windows 使用 `gradlew.bat`。设 `CI=true` 可走目标 NeoForge 的二进制补丁构建路径，校验的仍然是 Minecraft 26.3 / NeoForge 26.3.0.113 / Java 25。集成构建运行独立 `probe` 源集的 `integrationProbe`，用临时合成主档验证四种状态，并模拟未知异常、超时、重复注册、快照失配和普通断线。白名单回归还验证零项、多项、同名不同 UUID、任一设置关闭或身份缺失均产生零次读取提交，并覆盖异步读取后撤销许可。本机 Temurin 25.0.5.1+2 的集成构建通过 121 项合成断言，集成初版的根项目 `build` 通过 87 项 JUnit，0 失败、0 跳过。没有使用真实账号、真实存档或实机联机，合成用例不证明真实连接、并发安全或运行时磁盘行为。

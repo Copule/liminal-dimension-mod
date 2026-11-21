@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - 'test-data/m1-10-pre-placement-guard/**'
+      - 'src/testFixtures/java/io/github/copule/liminaldimension/playerdata/PlayerDimensionProbe.java'
       - '.github/workflows/placement-fixture.yml'
   pull_request:
     paths:
       - 'test-data/m1-10-pre-placement-guard/**'
+      - 'src/testFixtures/java/io/github/copule/liminaldimension/playerdata/PlayerDimensionProbe.java'
       - '.github/workflows/placement-fixture.yml'
 
 permissions:
