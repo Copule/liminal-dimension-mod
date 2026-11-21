@@ -40,3 +40,5 @@ python -m unittest discover -s tools/dimension_preflight -v
 ## Windows 实机存档副本对照（2026-11-21）
 
 在 Windows 上使用先前真实受认证生存补验的**移包前归档**，另行解压成只读检查对象，并按清单验证 53 个文件。用同一份副本和同一版预检程序做两次检查：移包后已核对的目标清单不含探针维度时，返回退出码 `1` / `BLOCK` / `DIMENSION_MISSING`；装包对照清单包含探针时，返回 `0` / `NO_MISSING_REFERENCES_FOUND` / `REFERENCE_PRESENT`。两次运行后副本 53 个文件和来源归档的哈希均未变。这验证的是预检能挡住已观察到的风险样本，不是运行时落点保护；不公开玩家标识或原始玩家档。
+
+`Dimension Preflight` 工作流在预检工具、合成测试或它自己的工作流文件变更时，在 GitHub 托管的 Linux 和 Windows 上用固定的 Python 3.13.14 运行同一条命令。它只使用仓库中的合成测试，不安装第三方 Python 包，不运行 M1-05 的旧探针测试或 Minecraft，也不上传任何档案。符号链接测试在系统允许创建链接时验证拒绝路径；如果 Windows 执行环境没有该权限，详细测试输出会将这一项标为跳过，而不是通过。

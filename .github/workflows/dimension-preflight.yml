@@ -1,0 +1,38 @@
+name: Dimension Preflight
+
+on:
+  push:
+    paths:
+      - 'tools/dimension_preflight/**'
+      - '.github/workflows/dimension-preflight.yml'
+  pull_request:
+    paths:
+      - 'tools/dimension_preflight/**'
+      - '.github/workflows/dimension-preflight.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Python 3.13.14
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13.14'
+
+      - name: Run preflight unit tests
+        run: python -m unittest discover -s tools/dimension_preflight -v
