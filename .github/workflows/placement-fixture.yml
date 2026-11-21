@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - 'test-data/m1-10-pre-placement-guard/**'
+      - 'src/testFixtures/java/io/github/copule/liminaldimension/playerdata/PlayerDimensionProbe.java'
       - '.github/workflows/placement-fixture.yml'
   pull_request:
     paths:
       - 'test-data/m1-10-pre-placement-guard/**'
+      - 'src/testFixtures/java/io/github/copule/liminaldimension/playerdata/PlayerDimensionProbe.java'
       - '.github/workflows/placement-fixture.yml'
 
 permissions:
@@ -34,3 +36,6 @@ jobs:
 
       - name: Compile and check standalone fixture
         run: ./gradlew --no-daemon --console=plain -p test-data/m1-10-pre-placement-guard guardProbe jar
+
+      - name: Build isolated authenticated placement experiment
+        run: ./gradlew --no-daemon --console=plain -p test-data/m1-10-pre-placement-guard/integration build

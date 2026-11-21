@@ -1,0 +1,41 @@
+plugins {
+    id 'java'
+    id 'net.neoforged.moddev' version '2.0.148'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+version = '0.1.0'
+
+// Package the reviewed sources only in this independent experiment's JAR.
+sourceSets.main.java {
+    srcDir '../src/main/java'
+    srcDir '../../../src/testFixtures/java'
+    include 'fixture/placement/PlacementGate.java'
+    include 'fixture/placement/AuthenticatedPlacementFixture.java'
+    include 'fixture/placement/PlacementAdmission.java'
+    include 'fixture/placement/PlacementScope.java'
+    include 'io/github/copule/liminaldimension/playerdata/PlayerDimensionProbe.java'
+}
+
+sourceSets {
+    probe {
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+neoForge {
+    version = '26.3.0.113'
+    addModdingDependenciesTo sourceSets.probe
+}
+
+tasks.register('integrationProbe', JavaExec) {
+    group = 'verification'
+    dependsOn probeClasses
+    classpath = sourceSets.probe.runtimeClasspath
+    mainClass = 'fixture.placement.PlacementIntegrationProbe'
+    workingDir = layout.buildDirectory.dir('integration-probe').get().asFile
+    doFirst { workingDir.mkdirs() }
+}
+
+tasks.named('check') { dependsOn integrationProbe }
