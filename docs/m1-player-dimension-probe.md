@@ -14,7 +14,7 @@ PR #9 的回滚实验表明，玩家保存的维度缺失时，原版回退仍�
 
 ## 判定与边界
 
-调用者提供稳定的合成世界根目录、类型为 `UUID` 的玩家标识和已加载维度 ID 的集合。探针检查 `players/data` 下该记录的主档和备份，仅返回状态枚举。
+调用者提供稳定的合成世界根目录、类型为 `UUID` 的玩家标识和已加载维度 ID 的集合。探针检查 `players/data` 下该记录的主档和备份，仅返回状态枚举。传入路径有 `.` 或 `..` 段时，在转换为绝对路径前返回 `UNCONFIRMED`。文件系统可能先解析符号链接再处理 `..`，而词法归一化可能选到另一目录。
 
 | 状态 | 含义 |
 | --- | --- |
@@ -23,9 +23,9 @@ PR #9 的回滚实验表明，玩家保存的维度缺失时，原版回退仍�
 | `DIMENSION_MISSING` | 同样可解码的主档维度 ID 不在调用者的集合中。 |
 | `UNCONFIRMED` | 文件或目录状态不明、仅有备份、旧布局存在、主档损坏、版本未知、类型或维度 ID 无效，或超过限额。 |
 
-文件打开为只读并指定 `NOFOLLOW_LINKS`，目录和主档须为预期类型且实际路径须与请求路径一致。备份只在主档缺席时检查存在性。压缩文件、解压输出、NBT 记账各限 8 MiB，NBT 容器深度限 128。GZIP 只接受原版写出的无可选字段头及单个完整成员，检查压缩边界、CRC32 和 ISIZE。NBT 只接受完整的无名根 compound，拒绝重复的两个判定字段。状态不包含 UUID、路径、坐标、维度 ID 或原始异常。
+文件打开为只读并指定 `NOFOLLOW_LINKS`，目录和主档须为预期类型且实际路径须与请求路径一致。备份存在性和旧布局只在主档缺席时检查。压缩文件、解压输出、NBT 记账各限 8 MiB，NBT 容器深度限 128。GZIP 只接受原版写出的无可选字段头及单个完整成员，检查压缩边界、CRC32 和 ISIZE。NBT 只接受完整的无名根 compound，拒绝重复的两个判定字段。状态不包含 UUID、路径、坐标、维度 ID 或原始异常。
 
-边界是调用者控制且没有并发写入的实验目录。Java 路径核对和打开之间存在时间窗，硬链接及并发替换未验证。判定只针对维度引用，独立于玩家其余字段的运行时加载结果。
+边界是调用者控制且没有并发写入的实验目录。探针跳过 `level.dat`，`NO_PLAYER_DATA` 仅说明所给目录中的文件状态，不能证明目录是完整、兼容的世界。未来接入必须由受信运行时提供权威世界根。Java 路径核对和打开之间存在时间窗，硬链接及并发替换未验证。判定只针对维度引用，独立于玩家其余字段的运行时加载结果。
 
 ## 复现
 
@@ -36,11 +36,13 @@ PR #9 的回滚实验表明，玩家保存的维度缺失时，原版回退仍�
 .\gradlew.bat --no-daemon --console=plain build
 ```
 
-`CI=true` 的本机执行返回 `BUILD SUCCESSFUL`。Gradle 报告 84 项 JUnit 通过，其中探针 25 项，0 失败、0 跳过。生产 JAR 内没有探针类。未执行 `runGameTestServer`。
+`CI=true` 的初版 Windows 执行返回 `BUILD SUCCESSFUL`。Gradle 报告 84 项 JUnit 通过，其中探针 25 项，0 失败、0 跳过。生产 JAR 内没有探针类。本机未执行 `runGameTestServer`。
 
 独立单元验证使用 Mojang 26.3 服务端内层 JAR、其随附的库以及 JUnit Platform Console Standalone 1.13.4，以 `javac --release 25` 编译两个源文件，再用 `ConsoleLauncher execute --select-class io.github.copule.liminaldimension.playerdata.PlayerDimensionProbeTest` 运行。项目 Gradle `build` 另行验证 NeoForge 编译、全量 JUnit 及生产 JAR 的源集边界。测试数据由原版 NBT 写入器或少量手工字节在临时目录中生成。测试覆盖四种状态、坏档及尾随数据、旧布局、限额和文件内容保持。两种验证均无需启动 Minecraft。实机登录、在线维度枚举、放置前接线、存档恢复与迁移决策留在本原型边界之外。
 
-Windows 上使用 Temurin 25.0.5.1+2 的独立单元验证通过 25 项，0 失败、0 跳过。测试覆盖目录和文件节点类型错误。环境拒绝为合成测试目录创建 Windows junction，因此未取得实际 junction 测试结果。
+Windows 上使用 Temurin 25.0.5.1+2 的初版独立单元验证通过 25 项，0 失败、0 跳过。测试覆盖目录和文件节点类型错误。环境拒绝为合成测试目录创建 Windows junction，因此未取得实际 junction 测试结果。
+
+路径回归包含三个普通点段输入。这三项在修复前的 Windows 独立测试中均失败，修复后 28 项全部通过。Windows 上以 `CI=true` 重跑 `build`，87 项 JUnit 通过，0 失败、0 跳过。Linux 另外创建真实符号链接，验证同一合成路径的系统解析与词法归一化落在不同目录，且探针返回 `UNCONFIRMED`。当前 Windows 环境创建符号链接需要管理员权限，Linux 用例由 Linux 上的 JUnit 执行。
 
 默认 Gradle 构建先遇到依赖下载停滞，复用按 Mojang 清单校验的 26.3 制品后继续。该次执行在 NeoForm 的 `recompile` 节点报告 `net/minecraft/world/waypoints/package-info.java: null`。使用 ModDevGradle 的 Eclipse 编译器开关时，同一节点报告 `Flexible Constructor Bodies is a preview feature and disabled by default`。这两次执行均未编译项目代码。ModDevGradle 在 `CI=true` 时使用目标版本的二进制补丁生成依赖，项目编译仍使用 Java 25 工具链。
 

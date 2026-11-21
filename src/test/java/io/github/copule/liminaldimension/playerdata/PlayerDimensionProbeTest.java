@@ -11,13 +11,17 @@ import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.Identifier;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestFactory;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -26,6 +30,7 @@ import static io.github.copule.liminaldimension.playerdata.PlayerDimensionProbe.
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.DynamicTest.dynamicTest;
 
 class PlayerDimensionProbeTest {
     private static final UUID PLAYER = UUID.fromString("00000000-0000-4000-8000-000000000001");
@@ -56,6 +61,38 @@ class PlayerDimensionProbeTest {
         Files.createDirectories(files);
         assertEquals(NO_PLAYER_DATA, inspect());
         assertEquals(UNCONFIRMED, PlayerDimensionProbe.inspect(temp.resolve("missing"), PLAYER, LOADED));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"world/.", "world/players/..", "./world"})
+    void rejectsDotSegmentsInTheSuppliedWorldPath(String path) throws IOException {
+        write(primary, compressed(record(OVERWORLD.toString())));
+        assertEquals(DIMENSION_LOADED, inspect());
+        assertEquals(UNCONFIRMED, PlayerDimensionProbe.inspect(temp.resolve(path), PLAYER, LOADED));
+    }
+
+    @TestFactory
+    Stream<DynamicTest> symlinkAndParentSegmentOnLinux() {
+        // The repository requires zero skipped cases. Register the POSIX fixture only on Linux.
+        if (!OS.LINUX.isCurrentOs()) {
+            return Stream.empty();
+        }
+        return Stream.of(dynamicTest("a symlink followed by .. cannot turn a missing dimension into no player data", () -> {
+            Path lexical = Files.createDirectory(temp.resolve("lexical"));
+            Path emptyWorld = Files.createDirectory(lexical.resolve("world"));
+            Path target = Files.createDirectories(temp.resolve("physical/deep"));
+            Path physicalWorld = target.getParent().resolve("world");
+            write(physicalWorld.resolve("players/data").resolve(primary.getFileName()),
+                    compressed(record("probe:removed")));
+            Path link = Files.createSymbolicLink(lexical.resolve("link"), target);
+            Path rawWorld = link.resolve("../world");
+
+            assertEquals(emptyWorld, rawWorld.normalize());
+            assertEquals(physicalWorld.toRealPath(), rawWorld.toRealPath());
+            assertEquals(NO_PLAYER_DATA, PlayerDimensionProbe.inspect(emptyWorld, PLAYER, LOADED));
+            assertEquals(DIMENSION_MISSING, PlayerDimensionProbe.inspect(physicalWorld, PLAYER, LOADED));
+            assertEquals(UNCONFIRMED, PlayerDimensionProbe.inspect(rawWorld, PLAYER, LOADED));
+        }));
     }
 
     @Test

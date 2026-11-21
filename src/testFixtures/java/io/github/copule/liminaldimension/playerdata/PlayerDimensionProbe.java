@@ -47,7 +47,14 @@ public final class PlayerDimensionProbe {
 
     public static Status inspect(Path world, UUID playerId, Set<Identifier> loadedDimensions) {
         try {
-            Path root = world.toAbsolutePath().normalize();
+            // A filesystem can follow a symlink before resolving its next ".." segment.
+            for (Path segment : world) {
+                String name = segment.toString();
+                if (name.equals(".") || name.equals("..")) {
+                    return Status.UNCONFIRMED;
+                }
+            }
+            Path root = world.toAbsolutePath();
             if (!isPlainDirectory(root, attributesIfPresent(root))) {
                 return Status.UNCONFIRMED;
             }
