@@ -1,6 +1,7 @@
 """Run the M1-05 experiment in a fresh, owner-authorized Windows server instance."""
 
 import argparse
+import gzip
 import hashlib
 import json
 import os
@@ -9,10 +10,12 @@ import queue
 import re
 import shutil
 import stat
+import struct
 import subprocess
 import threading
 import time
 import zipfile
+import zlib
 
 import nbtlib
 
@@ -28,6 +31,20 @@ NEOFORGE = "26.3.0.113"
 def require(condition, message):
     if not condition:
         raise RuntimeError(message)
+
+
+def enabled_pack_ids(response):
+    line = response.strip()
+    if re.search(r"\bThere are no data packs enabled\.?$", line):
+        return set()
+    match = re.search(r"\bThere are (\d+) data pack\(s\) enabled: (.+)$", line)
+    require(match is not None, f"Unrecognized enabled data pack list: {line}")
+    count, display = match.groups()
+    require(re.fullmatch(r"\[[^\[\]]+\](?:, \[[^\[\]]+\])*", display),
+            f"Malformed enabled data pack list: {line}")
+    entries = display[1:-1].split("], [")
+    require(len(entries) == int(count), f"Incomplete enabled data pack list: {line}")
+    return {re.sub(r" \((?:built-in|world)\)$", "", entry) for entry in entries}
 
 
 def write_json(path, value):
@@ -47,19 +64,63 @@ def inventory(directory, exclude=()):
     }
 
 
-def snapshot(world, phase, archive=False):
+def capture_inventory(world, phase):
     files = inventory(world, exclude={"session.lock"})
     write_json(phase / "files.json", files)
+    return files
+
+
+class ExactReads:
+    """Do not let the NBT parser interpret EOF as a zero/compound end marker."""
+
+    def __init__(self, stream):
+        self.stream = stream
+
+    def read(self, size):
+        if size < 0:
+            raise ValueError("Negative NBT read length")
+        data = self.stream.read(size)
+        if len(data) != size:
+            raise EOFError("Truncated level.dat")
+        return data
+
+
+def read_level_root(stream):
+    root = nbtlib.File.parse(ExactReads(stream))
+    if stream.read(1):
+        raise ValueError("Unexpected data after level.dat root")
+    # On gzip inputs, the EOF check also validates the stream trailer.
+    return root
+
+
+def checked_level_data(path):
+    try:
+        with path.open("rb") as raw:
+            if raw.peek(2)[:2] == b"\x1f\x8b":
+                with gzip.GzipFile(fileobj=raw, mode="rb") as stream:
+                    data = read_level_root(stream).get("Data")
+            else:
+                data = read_level_root(raw).get("Data")
+    except (OSError, EOFError, ValueError, TypeError, KeyError, struct.error, zlib.error) as exc:
+        raise RuntimeError(f"Cannot read level.dat: {path}") from exc
+    require(isinstance(data, nbtlib.Compound), f"Missing or invalid level.dat Data compound: {path}")
+    return data
+
+
+def snapshot(world, phase, archive=False):
+    files = capture_inventory(world, phase)
+    require("level.dat" in files, f"Missing level.dat in world: {world}")
+    level_data = checked_level_data(world / "level.dat")
     nbt = {}
     for name in files:
         if name in {"level.dat", "level.dat_old"} or name.endswith(("/world_gen_settings.dat", "/chunk_tickets.dat")):
-            tag = nbtlib.load(world / name)
             if name.startswith("level.dat"):
-                data = tag["Data"]
+                data = level_data if name == "level.dat" else nbtlib.load(world / name)["Data"]
                 keys = ("DataVersion", "Version", "DataPacks", "enabled_features", "WorldGenSettings",
                         "LastPlayed", "Time", "DayTime", "spawn", "initialized")
                 tag = {key: data[key].snbt() for key in keys if key in data}
             else:
+                tag = nbtlib.load(world / name)
                 data = tag.get("data")
                 tag = {"DataVersion": tag.get("DataVersion"), "data_snbt": data.snbt() if data else None}
                 if name.endswith("/world_gen_settings.dat") and data:
@@ -77,9 +138,9 @@ def snapshot(world, phase, archive=False):
                 with saved.open(name) as stream:
                     require(hashlib.file_digest(stream, "sha256").hexdigest() == info["sha256"],
                             f"Archive content differs: {name}")
+        backup.chmod(stat.S_IREAD)
         write_json(phase / "backup.json", {"sha256": sha256(backup), "bytes": backup.stat().st_size,
                                           "verified_files": len(files)})
-        backup.chmod(stat.S_IREAD)
     return files
 
 
@@ -205,7 +266,8 @@ def run_phase(args, name, world_name, *, vanilla=False, pack=False, preinstalled
         result["ready"] = "Done (" in outcome
         require(result["ready"], outcome)
         pack_response = console.command("datapack list enabled", r"data pack\(s\) enabled|no data packs enabled")
-        require((PACK_ID in pack_response) == pack, pack_response)
+        require((PACK_ID in enabled_pack_ids(pack_response)) == pack,
+                f"Expected enabled {PACK_ID}={pack}. {pack_response}")
         console.tickets(OVERWORLD, extra=False, create=create_overworld)
         console.block(OVERWORLD, "gold_block", create_overworld)
         unknown_probe = f"Unknown dimension '{PROBE}'"
@@ -239,10 +301,24 @@ def run_phase(args, name, world_name, *, vanilla=False, pack=False, preinstalled
             if log.exists():
                 shutil.copyfile(log, phase / filename)
         write_json(phase / "result.json", result)
-    files = snapshot(world, phase, archive=not name.endswith("rollback"))
+    process_passed = (result["ready"] and result["probes_passed"] and result["exit_code"] == 0
+                      and not result["forced_termination"])
+    if not process_passed:
+        # Partial worlds are useful evidence, but never publish them as rollback backups.
+        try:
+            capture_inventory(world, phase)
+        except OSError as exc:
+            result["inventory_error"] = f"{type(exc).__name__}: {exc}"
+            write_json(phase / "result.json", result)
+        raise RuntimeError(f"{name} failed. Inspect {phase / 'result.json'}")
+    try:
+        files = snapshot(world, phase, archive=not name.endswith("rollback"))
+    except (OSError, EOFError, ValueError, TypeError, KeyError, RuntimeError,
+            struct.error, zipfile.BadZipFile, zlib.error) as exc:
+        result["snapshot_error"] = f"{type(exc).__name__}: {exc}"
+        write_json(phase / "result.json", result)
+        raise RuntimeError(f"{name} failed world snapshot validation. Inspect {phase / 'result.json'}") from exc
     print(f"{name}: ready={result['ready']}, probes={result['probes_passed']}, exit={result['exit_code']}", flush=True)
-    require(result["ready"] and result["probes_passed"] and result["exit_code"] == 0
-            and not result["forced_termination"], f"{name} failed. Inspect {phase / 'result.json'}")
     return files
 
 
@@ -276,11 +352,17 @@ def restore_backup(phase, target):
     backup = phase / "world.zip"
     expected = json.loads((phase / "backup.json").read_text("utf-8"))
     require(sha256(backup) == expected["sha256"], f"Backup checksum changed: {backup}")
-    target.mkdir()
-    with zipfile.ZipFile(backup) as archive:
-        archive.extractall(target)
     files = json.loads((phase / "files.json").read_text("utf-8"))
+    require("level.dat" in files and expected["verified_files"] == len(files),
+            f"Backup manifest lacks a verified world: {backup}")
+    with zipfile.ZipFile(backup) as archive:
+        names = archive.namelist()
+        require(len(names) == len(files) and set(names) == files.keys(),
+                f"Archive entries differ: {backup}")
+        target.mkdir()
+        archive.extractall(target)
     require(inventory(target) == files, f"Restored directory differs: {target}")
+    checked_level_data(target / "level.dat")
     return {"archive_sha256": expected["sha256"], "verified_files": len(files)}
 
 

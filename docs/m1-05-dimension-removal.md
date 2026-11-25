@@ -48,6 +48,15 @@
 python ./test-data/m1-05/run_dimension_removal.py --runtime "<隔离目录>/runtime" --evidence "<隔离目录>/dedicated" --java "<JDK25>/bin/java.exe" --port 25576
 ~~~
 
+只有控制台探测通过、JVM 正常退出且根目录的 `level.dat` 可完整读取并包含 NBT `Data` compound，阶段才通过验收。启用数据包按控制台列表中的完整 ID 核对，不把同名前缀当成探针包。缺失/不完整世界的哈希清单仍可留作排查，不代表可回滚；只有通过备份校验的阶段才发布 `backup.json`。回滚会拒绝不含根 `level.dat` 的旧归档，并再次验证恢复出来的 NBT。
+
+仅复跑脚本的合成回归时，在仓库根目录使用以下命令，不会启动 Minecraft 专服。GitHub Actions 的独立 Python 作业使用相同命令。
+
+~~~powershell
+python -m pip install nbtlib==2.0.4
+python -B -m unittest discover -v -s test-data/m1-05
+~~~
+
 ## 验收边界与发布建议
 
 - **已实测通过**：原 M1-04 包两种世界创建路径的移除与恢复，主世界与探针状态、备份校验和原版回滚启动。
