@@ -6,6 +6,11 @@ The 《未完全死亡》 mod is a single Java module. NeoForge discovers it thr
 `Liminal Dimension initialized (liminal_dimension).` on either physical side.
 This is the entire runtime behavior at M0.
 
+M0 was limited to the minimal Minecraft Java 26.3 / NeoForge ModDevGradle
+bootstrap targeting Java 25, with no gameplay systems, dimensions, death
+hooks, assets, bosses, or story implementation. For current scope, see
+[the agent guide](../AGENTS.md#read-first).
+
 ## Build baseline
 
 | Component | Pinned version |
@@ -18,8 +23,8 @@ This is the entire runtime behavior at M0.
 
 The build imports the official template at commit
 [`324165e`](https://github.com/NeoForgeMDKs/MDK-26.3-ModDevGradle/tree/324165e73bc50e912270863278d64827bde71ad7).
-The Wrapper and toolchain versions come from that revision. The NeoForge
-coordinate is also published in the [official Maven repository](https://maven.neoforged.net/releases/net/neoforged/neoforge/26.3.0.113/neoforge-26.3.0.113.pom).
+The Wrapper and toolchain versions come from that revision. Prefer the official
+MDK, preserve the Gradle wrapper, and record any intentional version changes. The NeoForge coordinate is also published in the [official Maven repository](https://maven.neoforged.net/releases/net/neoforged/neoforge/26.3.0.113/neoforge-26.3.0.113.pom).
 The template license is in `TEMPLATE_LICENSE.txt`.
 
 ## Project layout
