@@ -77,6 +77,16 @@ class ProductionJarTest {
     }
 
     @Test
+    void productionJarExcludesDatagenCaches() throws IOException {
+        try (var jar = openJar()) {
+            var caches = jar.stream().map(entry -> entry.getName())
+                    .filter(name -> name.startsWith(".cache/") || name.contains("/.cache/"))
+                    .sorted().toList();
+            assertTrue(caches.isEmpty(), () -> "Datagen cache leaked into production: " + caches);
+        }
+    }
+
+    @Test
     void productionJarExcludesTheDimensionTestPack() throws IOException {
         try (var jar = openJar()) {
             var fixtureEntries = jar.stream().map(entry -> entry.getName())
